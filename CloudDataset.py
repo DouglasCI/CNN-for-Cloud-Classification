@@ -1,68 +1,72 @@
 import torch
 import os
-from torchvision import transforms
 from tqdm import tqdm
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
+from torchvision import transforms
 
 
 class CloudDataset():
-    def __init__(self, data_dir, verbose=True):
-        self.X_data, self.y_data = _loadImages(self, data_dir, verbose)
+    def __init__(self, data_dir, verbose=True, train_size=0.8):
+        self.train_size = train_size
+        self.X_data, self.y_data = _loadImages(data_dir, verbose)
 
     def getData(self):
         """
-        Retorno:
-        - X_train: tensor com os dados de treino
-        - y_train: tensor com os rótulos de treino
-        - X_val: tensor com os dados de validação
-        - y_val: tensor com os rótulos de validação
+        Get data split in training and test parts.\n
+        Return:
+        - X_train: tensor with image data for training
+        - y_train: tensor with labels for training
+        - X_test: tensor with image data for test
+        - y_test: tensor with labels for test
         """
-        N = self.X_data.shape[0]
-        X_train = self.X_data[0:3 * (N // 4)]
-        y_train = self.y_data[0:3 * (N // 4)]
-        X_val = self.X_data[3 * (N // 4):]
-        y_val = self.y_data[3 * (N // 4):]
-        return X_train, y_train, X_val, y_val
+        classes = torch.arange(torch.max(self.y_data) + 1)
+        X_train = torch.empty((0), dtype=self.X_data.dtype)
+        y_train = torch.empty((0), dtype=self.y_data.dtype)
+        X_test = torch.empty((0), dtype=self.X_data.dtype)
+        y_test = torch.empty((0), dtype=self.y_data.dtype)
 
-    def getSample(self, sample_size):
-        """
-        Entrada:
-        - sample_size: tamanho da amostra
+        for c in classes:
+            XX = self.X_data[c == self.y_data]
+            yy = self.y_data[c == self.y_data]
+            N = XX.shape[0]
+            num_train = int(N * self.train_size)
 
-        Retorno:
-        - X_sample: tensor com os dados do tamanho da amostra
-        - y_sample: tensor com os rótulos do tamanho da amostra
-        """
-        mask = torch.randint(self.X_data.shape[0], (sample_size,))
-        X_sample = self.X_data[mask]
-        y_sample = self.y_data[mask]
+            X_train = torch.cat((X_train, XX[0:num_train]), 0)
+            y_train = torch.cat((y_train, yy[0:num_train]), 0)
+            X_test = torch.cat((X_test, XX[num_train:N]), 0)
+            y_test = torch.cat((y_test, yy[num_train:N]), 0)
 
-        return X_sample, y_sample
+        return X_train, y_train, X_test, y_test
 
-def _getFiles(self, data_dir):
+def _getFiles(data_dir):
     """
-    Retorno:
-    - files: arquivos do banco de dados
+    Parameters:
+    - data_dir: directory where dataset is located\n
+    Return:
+    - files: files from database
     """
     files = []
     for file in os.listdir(data_dir):
         files.append(file)
     return files
 
-def _loadImages(self, data_dir, verbose=True):
+def _loadImages(data_dir, verbose=True):
     """
-    Retorno:
-    - X_data: tensor com os dados
-    - y_data: tensor com os rótulos
+    Parameters:
+    - data_dir: directory where dataset is located
+    - verbose (default is True): boolean to show or not debug messages\n
+    Return:
+    - X_data: tensor with image data
+    - y_data: tensor with labels
     """
-    files = _getFiles(self, data_dir)
-    xdata = []  #dados das imagens
-    ydata = []  #rotulos
-    count = 0   #contador para a rotulagem
-    transform = transforms.Compose([ transforms.ToTensor() ])
-    img_size = (200, 200)
+    files = _getFiles(data_dir)
+    xdata = []  #list of images data
+    ydata = []  #list of labels
+    count = 0   #counter for labeling
+    img_size = (64, 64)
+    transform = transforms.Compose([ transforms.ToTensor() ]) #convert to tensor
 
-    if verbose: print("Loading data from " + data_dir)
+    if verbose: print("> Loading data from " + data_dir)
     for file in files:
         path = os.path.join(data_dir, file)
         dir = tqdm(os.listdir(path)) if verbose else os.listdir(path)
@@ -70,15 +74,15 @@ def _loadImages(self, data_dir, verbose=True):
         for im in dir:
             image = load_img(os.path.join(path, im), grayscale=False, color_mode='rgb', target_size=img_size)
             image = img_to_array(image)
-            image = image / 255.0 #intervalo de valores [0, 1]
-            image_tensor = transform(image) #converte em tensor
+            image = image / 255.0 #interval between [0, 1]
+            image_tensor = transform(image)
             xdata.append(image_tensor)
             ydata.append(count)
-        
+
         count += 1
-        if verbose: print(f"Data from {file} loaded.")
+        if verbose: print(f"> Data from {file} loaded.")
 
     X_data = torch.stack(xdata, 0)
-    y_data = torch.tensor(ydata, dtype=torch.float) #converte em tensor
+    y_data = torch.tensor(ydata)
 
     return X_data, y_data
