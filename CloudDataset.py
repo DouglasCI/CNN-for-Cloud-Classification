@@ -63,7 +63,7 @@ def _loadImages(data_dir, verbose=True):
     xdata = []  #list of images data
     ydata = []  #list of labels
     count = 0   #counter for labeling
-    img_size = (64, 64)
+    img_size = (100, 100)
     transform = transforms.Compose([ transforms.ToTensor() ]) #convert to tensor
 
     if verbose: print("> Loading data from " + data_dir)

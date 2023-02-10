@@ -14,15 +14,15 @@ class CNN(nn.Module):
         super(CNN, self).__init__()
 
         # first set of Conv -> ReLU -> Max Pool layers
-        self.conv1 = nn.Conv2d(in_channels=num_color_channels, out_channels=20, kernel_size=(5, 5))
+        self.conv1 = nn.Conv2d(in_channels=num_color_channels, out_channels=30, kernel_size=(5, 5))
         self.relu1 = nn.ReLU()
         self.maxpool1 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
         # second set of Conv -> ReLU -> Max Pool layers
-        self.conv2 = nn.Conv2d(in_channels=20, out_channels=50, kernel_size=(5, 5))
+        self.conv2 = nn.Conv2d(in_channels=30, out_channels=100, kernel_size=(5, 5))
         self.relu2 = nn.ReLU()
         self.maxpool2 = nn.MaxPool2d(kernel_size=(2, 2), stride=(2, 2))
         # FC -> ReLU -> FC layers
-        self.fc1 = nn.Linear(in_features=8450, out_features=500)
+        self.fc1 = nn.Linear(in_features=48400, out_features=500)
         self.relu3 = nn.ReLU()
         self.fc2 = nn.Linear(in_features=500, out_features=num_classes)
         # Softmax classifier

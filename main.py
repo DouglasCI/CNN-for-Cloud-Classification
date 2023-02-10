@@ -93,17 +93,17 @@ def main():
     } #history of statistics
 
     print("Training the network...")
-    startTime = time.time()
+    start = time.time()
 
     for ep in range(EPOCHS):
         model.train()
         # initialize the total training and validation loss
-        totalTrainLoss = 0
-        totalValLoss = 0
+        train_loss = 0
+        val_loss = 0
         # initialize the number of correct predictions in the training
         # and validation step
-        trainCorrect = 0
-        valCorrect = 0
+        num_train_correct = 0
+        num_val_correct = 0
         # loop over the training set
         X_batches_train, y_batches_train = get_batches(X_train, y_train, num_train, BATCH_SIZE)
         for X_batch_train, y_batch_train in zip(X_batches_train, y_batches_train):
@@ -121,8 +121,8 @@ def main():
             optimizer.step()
             # add the loss to the total training loss so far and
             # calculate the number of correct predictions
-            totalTrainLoss += loss
-            trainCorrect += (pred.argmax(1) == y_batch_train).type(torch.float).sum().item()
+            train_loss += loss
+            num_train_correct += (pred.argmax(1) == y_batch_train).type(torch.float).sum().item()
 
         # switch off autograd for evaluation
         with torch.no_grad():
@@ -137,33 +137,33 @@ def main():
                 y_batch_val = y_batch_val.to(DEVICE)
                 # make the predictions and calculate the validation loss
                 pred = model(X_batch_val)
-                totalValLoss += loss_func(pred, y_batch_val)
+                val_loss += loss_func(pred, y_batch_val)
                 # calculate the number of correct predictions
-                valCorrect += (pred.argmax(1) == y_batch_val).type(torch.float).sum().item()
+                num_val_correct += (pred.argmax(1) == y_batch_val).type(torch.float).sum().item()
         
         # calculate the average training and validation loss
         num_iter_train = max(num_train // BATCH_SIZE, 1)
         num_iter_val = max(num_val // BATCH_SIZE, 1)
-        avgTrainLoss = totalTrainLoss / num_iter_train
-        avgValLoss = totalValLoss / num_iter_val
+        avg_train_loss = train_loss / num_iter_train
+        avg_val_loss = val_loss / num_iter_val
         # calculate the training and validation accuracy
-        trainCorrect = trainCorrect / num_train
-        valCorrect = valCorrect / num_val
+        num_train_correct = num_train_correct / num_train
+        num_val_correct = num_val_correct / num_val
         # update our training history
-        history["train_loss"].append(avgTrainLoss.cpu().detach().numpy())
-        history["train_acc"].append(trainCorrect)
-        history["val_loss"].append(avgValLoss.cpu().detach().numpy())
-        history["val_acc"].append(valCorrect)
+        history["train_loss"].append(avg_train_loss.cpu().detach().numpy())
+        history["train_acc"].append(num_train_correct)
+        history["val_loss"].append(avg_val_loss.cpu().detach().numpy())
+        history["val_acc"].append(num_val_correct)
         # print the model training and validation information
         print("[INFO] EPOCH: {}/{}".format(ep + 1, EPOCHS))
         print("Train loss: {:.6f}, Train accuracy: {:.4f}".format(
-            avgTrainLoss, trainCorrect))
+            avg_train_loss, num_train_correct))
         print("Val loss: {:.6f}, Val accuracy: {:.4f}\n".format(
-            avgValLoss, valCorrect))
+            avg_val_loss, num_val_correct))
     
     # finish measuring how long training took
-    endTime = time.time()
-    print("[INFO] total time taken to train the model: {:.2f}s".format(endTime - startTime))
+    end = time.time()
+    print("[INFO] total time taken to train the model: {:.2f}s".format(end - start))
     # we can now evaluate the network on the test set
     print("[INFO] evaluating network...")
     # turn off autograd for testing evaluation
