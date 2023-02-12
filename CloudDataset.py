@@ -35,6 +35,15 @@ class CloudDataset():
             y_train = torch.cat((y_train, yy[0:num_train]), 0)
             X_test = torch.cat((X_test, XX[num_train:N]), 0)
             y_test = torch.cat((y_test, yy[num_train:N]), 0)
+            
+        # torch.set_printoptions(threshold=10_000)
+        # counts_y = self.y_data.unique(return_counts=True)[1]
+        # print(f"{counts_y=}")
+        # counts_y_train = y_train.unique(return_counts=True)[1]
+        # print(f"{counts_y_train=}")
+        # counts_y_test = y_test.unique(return_counts=True)[1]
+        # print(f"{counts_y_test=}")
+        # print(f"{counts_y_train/counts_y=}")
 
         return X_train, y_train, X_test, y_test
 
@@ -63,7 +72,7 @@ def _loadImages(data_dir, verbose=True):
     xdata = []  #list of images data
     ydata = []  #list of labels
     count = 0   #counter for labeling
-    img_size = (100, 100)
+    img_size = (224, 224)
     transform = transforms.Compose([ transforms.ToTensor() ]) #convert to tensor
 
     if verbose: print("> Loading data from " + data_dir)
