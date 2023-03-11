@@ -1,7 +1,6 @@
 import torch
 import os
 from tqdm import tqdm
-from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from torchvision import transforms
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -14,11 +13,11 @@ class CloudDataset():
     def getData(self):
         """
         Get data split in training and test parts.\n
-        Return:
-        - X_train: tensor with image data for training
-        - y_train: tensor with labels for training
-        - X_test: tensor with image data for test
-        - y_test: tensor with labels for test
+        Returns:
+        - tensor: image data for training
+        - tensor: labels for training
+        - tensor: image data for test
+        - tensor: labels for test
         """
         classes = torch.arange(torch.max(self.y_data) + 1)
         X_train = torch.empty((0), dtype=self.X_data.dtype)
@@ -51,9 +50,9 @@ class CloudDataset():
 def _getFiles(data_dir):
     """
     Parameters:
-    - data_dir: directory where dataset is located\n
-    Return:
-    - files: files from database
+    - data_dir (string): directory where dataset is located\n
+    Returns:
+    - list: files from database
     """
     files = []
     for file in os.listdir(data_dir):
@@ -63,17 +62,21 @@ def _getFiles(data_dir):
 def _loadImages(data_dir, verbose=True):
     """
     Parameters:
-    - data_dir: directory where dataset is located
-    - verbose (default is True): boolean to show or not debug messages\n
-    Return:
-    - X_data: tensor with image data
-    - y_data: tensor with labels
+    - data_dir (string): directory where dataset is located
+    - verbose (boolean): show or not debug messages\n
+    Returns:
+    - tensor: image data
+    - tensor: labels
     """
     files = _getFiles(data_dir)
     xdata = []  #list of images data
     ydata = []  #list of labels
     count = 0   #counter for labeling
     img_size = (224, 224)
+    resize_transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Resize(size=img_size)
+    ])
 
     if verbose: print("> Loading data from " + data_dir)
     for file in files:
@@ -83,20 +86,12 @@ def _loadImages(data_dir, verbose=True):
         for img in dir:
             img_path = os.path.join(path, img)
             image = Image.open(img_path)
-            image_tensor = transforms.ToTensor()(image)
-            mean, std = image_tensor.mean([1, 2]), image_tensor.std([1, 2])
-            print(mean, std)
-            normalized_img = transforms.Normalize(mean, std)(image_tensor)
+            image_tensor = resize_transform(image)
+            # mean, std = image_tensor.mean([1, 2]), image_tensor.std([1, 2])
+            # normalized_img = transforms.Normalize(mean, std)(image_tensor)
             
-            print(f"{image_tensor=}")
-            print(f"{normalized_img=}")
-            plt.imshow(image)
-            plt.show()
-            plt.imshow(normalized_img.permute(1, 2, 0))
-            plt.show()
-            
-            # xdata.append(image_tensor)
-            # ydata.append(count)
+            xdata.append(image_tensor)
+            ydata.append(count)
 
         count += 1
         if verbose: print(f"> Data from {file} loaded.")
@@ -106,9 +101,26 @@ def _loadImages(data_dir, verbose=True):
 
     return X_data, y_data
 
+def show_image(image):
+    plt.imshow(image.permute(1, 2, 0))
+    plt.show()
+
 def main():
     dataset = CloudDataset("database/CCSN_v2/")
-    dataset.getData()
-
+    X_train, y_train, X_test, y_test = dataset.getData()
+    
+    mean = X_train.mean([0, 2, 3])
+    std = X_train.std([0, 2, 3])
+    test_transform = transforms.Compose([
+        transforms.Normalize(mean, std)
+    ])
+    
+    X_normalized = test_transform(X_train)
+    
+    show_image(X_train[0])
+    show_image(X_normalized[0])
+    print(X_train.shape)
+    print(X_normalized.shape)
+    
 if __name__ == "__main__":
     main()

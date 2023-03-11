@@ -7,51 +7,28 @@ from CNN import CNN
 from CloudDataset import CloudDataset
 from torch import nn
 from torch.optim import SGD
+from torchvision import transforms
 from sklearn.metrics import classification_report
 
 
 LEARN_RATE = 1e-3
 EPOCHS = 20
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 TRAIN_SIZE = 0.75
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-def get_batches(X, y, data_size, batch_size, random=True):
-    """
-    Split a dataset and its labels into randomized batches\n
-    Parameters:
-    - X: input dataset (tensor)
-    - y: input labels (tensor)
-    - data_size: size of dataset
-    - batch_size: size of batches
-    - random: decide if batches are randomized or not\n
-    Return:
-    - X_batches: list with image data batches (tensors)
-    - y_batches: list with labels batches (tensors)
-    """
-    num_batches = int(data_size / batch_size)
-    X_batches = []
-    y_batches = []
-    mask = torch.randperm(data_size) if random else torch.arange(data_size)
-    for n in range(num_batches):
-        m = mask[n * batch_size:(n + 1) * batch_size]
-        X_batches.append(X[m])
-        y_batches.append(y[m])
-
-    return X_batches, y_batches
 
 def split_data(X, y, data_size, train_size):
     """
     Parameters:
-    - X: input dataset (tensor)
-    - y: input labels (tensor)
-    - data_size: size of dataset
-    - train_size: size of train tensor\n
-    Return:
-    - X_train: tensor with image data for training
-    - y_train: tensor with labels for training
-    - X_val: tensor with image data for validation
-    - y_val: tensor with labels for validation
+    - X (tensor): input dataset
+    - y (tensor): input labels
+    - data_size (int): size of dataset
+    - train_size (int): size of train tensor\n
+    Returns:
+    - tensor: image data for training
+    - tensor: labels for training
+    - tensor: image data for validation
+    - tensor: labels for validation
     """
     mask = torch.randperm(data_size)
     split = int(data_size * train_size)
@@ -65,6 +42,46 @@ def split_data(X, y, data_size, train_size):
 
     return X_train, y_train, X_val, y_val
 
+def get_batches(X, y, data_size, batch_size, random=True):
+    """
+    Split a dataset and its labels into randomized batches\n
+    Parameters:
+    - X (tensor): input dataset
+    - y (tensor): input labels
+    - data_size (int): size of dataset
+    - batch_size (int): size of batches
+    - random (boolean): decide if batches are randomized or not\n
+    Returns:
+    - list: list with image data batches
+    - list: list with labels batches
+    """
+    num_batches = int(data_size / batch_size)
+    X_batches = []
+    y_batches = []
+    mask = torch.randperm(data_size) if random else torch.arange(data_size)
+    for n in range(num_batches):
+        m = mask[n * batch_size:(n + 1) * batch_size]
+        X_batches.append(X[m])
+        y_batches.append(y[m])
+
+    return X_batches, y_batches
+
+def normalize(X):
+    """
+    Parameters:
+    - X (tensor): input dataset\n
+    Returns:
+    - tensor: normalized tensor
+    """
+    mean = X.mean([0, 2, 3])
+    std = X.std([0, 2, 3])
+    X_normalized = transforms.Normalize(mean, std)(X)
+        
+    return X_normalized
+
+def augment(X, y):
+    pass
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-m", "--model", type=str, required=True, help="./")
@@ -75,6 +92,10 @@ def main():
     dataset = CloudDataset("database/CCSN_v2/")
     X_t, y_t, X_test, y_test = dataset.getData()
     X_train, y_train, X_val, y_val = split_data(X_t, y_t, X_t.shape[0], TRAIN_SIZE)
+    # normalize the entire test and validation dataset
+    # the training dataset will be normalized in batches
+    X_test_norm = normalize(X_test)
+    X_val_norm = normalize(X_val)
 
     num_train = X_train.shape[0]
     num_val = X_val.shape[0]
@@ -107,12 +128,16 @@ def main():
         # split the training set into batches and iterate over them
         X_batches_train, y_batches_train = get_batches(X_train, y_train, num_train, BATCH_SIZE, random=True)
         for X_batch_train, y_batch_train in zip(X_batches_train, y_batches_train):
-            # send the input to the device
-            X_batch_train = X_batch_train.to(DEVICE)
+            # normalize this batch
+            X_batch_train_norm = normalize(X_batch_train)
+            X_batch_aug = augment(X_batch_train_norm)
+            
+            # send it to the device
+            X_batch_aug = X_batch_aug.to(DEVICE)
             y_batch_train = y_batch_train.type(torch.LongTensor)
             y_batch_train = y_batch_train.to(DEVICE)
             
-            pred = model(X_batch_train) #forward pass
+            pred = model(X_batch_aug) #forward pass
             loss = loss_func(pred, y_batch_train) #calculate loss
             optimizer.zero_grad() #zero out gradients
             loss.backward() #backpropagation
@@ -128,9 +153,9 @@ def main():
             model.eval()
             
             # split the validation set into batches and iterate over them
-            X_batches_val, y_batches_val = get_batches(X_val, y_val, num_val, BATCH_SIZE, random=False)
+            X_batches_val, y_batches_val = get_batches(X_val_norm, y_val, num_val, BATCH_SIZE, random=False)
             for X_batch_val, y_batch_val in zip(X_batches_val, y_batches_val):
-                # send the input to the device
+                # send it to the device
                 X_batch_val = X_batch_val.to(DEVICE)
                 y_batch_val = y_batch_train.type(torch.LongTensor)
                 y_batch_val = y_batch_val.to(DEVICE)
@@ -176,9 +201,9 @@ def main():
         # initialize a list to store our predictions
         preds = []
         # split the test set into batches and iterate over them
-        X_batches_test, y_batches_test = get_batches(X_test, y_test, num_test, BATCH_SIZE, random=False)
+        X_batches_test, y_batches_test = get_batches(X_test_norm, y_test, num_test, BATCH_SIZE, random=False)
         for X_batch_test, y_batches_test in zip(X_batches_test, y_batches_test):
-            # send the input to the device
+            # send it to the device
             X_batch_test = X_batch_test.to(DEVICE)
             
             # make the predictions and add them to the list
