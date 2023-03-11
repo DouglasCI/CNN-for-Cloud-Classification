@@ -3,7 +3,8 @@ import os
 from tqdm import tqdm
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
 from torchvision import transforms
-
+import matplotlib.pyplot as plt
+from PIL import Image
 
 class CloudDataset():
     def __init__(self, data_dir, verbose=True, train_size=0.8):
@@ -25,6 +26,7 @@ class CloudDataset():
         X_test = torch.empty((0), dtype=self.X_data.dtype)
         y_test = torch.empty((0), dtype=self.y_data.dtype)
 
+        # split datasets into balanced train and test parts
         for c in classes:
             XX = self.X_data[c == self.y_data]
             yy = self.y_data[c == self.y_data]
@@ -36,7 +38,6 @@ class CloudDataset():
             X_test = torch.cat((X_test, XX[num_train:N]), 0)
             y_test = torch.cat((y_test, yy[num_train:N]), 0)
             
-        # torch.set_printoptions(threshold=10_000)
         # counts_y = self.y_data.unique(return_counts=True)[1]
         # print(f"{counts_y=}")
         # counts_y_train = y_train.unique(return_counts=True)[1]
@@ -73,20 +74,29 @@ def _loadImages(data_dir, verbose=True):
     ydata = []  #list of labels
     count = 0   #counter for labeling
     img_size = (224, 224)
-    transform = transforms.Compose([ transforms.ToTensor() ]) #convert to tensor
 
     if verbose: print("> Loading data from " + data_dir)
     for file in files:
         path = os.path.join(data_dir, file)
         dir = tqdm(os.listdir(path)) if verbose else os.listdir(path)
         
-        for im in dir:
-            image = load_img(os.path.join(path, im), grayscale=False, color_mode='rgb', target_size=img_size)
-            image = img_to_array(image)
-            image = image / 255.0 #interval between [0, 1]
-            image_tensor = transform(image)
-            xdata.append(image_tensor)
-            ydata.append(count)
+        for img in dir:
+            img_path = os.path.join(path, img)
+            image = Image.open(img_path)
+            image_tensor = transforms.ToTensor()(image)
+            mean, std = image_tensor.mean([1, 2]), image_tensor.std([1, 2])
+            print(mean, std)
+            normalized_img = transforms.Normalize(mean, std)(image_tensor)
+            
+            print(f"{image_tensor=}")
+            print(f"{normalized_img=}")
+            plt.imshow(image)
+            plt.show()
+            plt.imshow(normalized_img.permute(1, 2, 0))
+            plt.show()
+            
+            # xdata.append(image_tensor)
+            # ydata.append(count)
 
         count += 1
         if verbose: print(f"> Data from {file} loaded.")
@@ -95,3 +105,10 @@ def _loadImages(data_dir, verbose=True):
     y_data = torch.tensor(ydata)
 
     return X_data, y_data
+
+def main():
+    dataset = CloudDataset("database/CCSN_v2/")
+    dataset.getData()
+
+if __name__ == "__main__":
+    main()

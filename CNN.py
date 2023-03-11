@@ -13,21 +13,6 @@ class CNN(nn.Module):
 
         super(CNN, self).__init__()
         
-        # # first set of Conv -> ReLU -> Max Pool layers
-        # self.conv1 = nn.Conv2d(in_channels=num_color_channels, out_channels=30, kernel_size=(5, 5))
-        # self.relu1 = nn.ReLU()
-        # self.maxpool1 = nn.MaxPool2d(kernel_size=(3, 3), stride=(2, 2))
-        # # second set of Conv -> ReLU -> Max Pool layers
-        # self.conv2 = nn.Conv2d(in_channels=30, out_channels=100, kernel_size=(5, 5))
-        # self.relu2 = nn.ReLU()
-        # self.maxpool2 = nn.MaxPool2d(kernel_size=(3, 3), stride=(2, 2))
-        # # FC -> ReLU -> FC layers
-        # self.fc1 = nn.Linear(in_features=44100, out_features=500)
-        # self.relu3 = nn.ReLU()
-        # self.fc2 = nn.Linear(in_features=500, out_features=num_classes)
-        # # Softmax classifier
-        # self.logSoftmax = nn.LogSoftmax(dim=1)
-        
         self.layer1 = nn.Sequential(
             nn.Conv2d(num_color_channels, 96, kernel_size=11, stride=4, padding=0),
             nn.BatchNorm2d(96),
@@ -63,26 +48,6 @@ class CNN(nn.Module):
             nn.Linear(4096, num_classes))
 
     def forward(self, x):
-        # x = self.conv1(x)
-        # # Conv1 -> ReLU1
-        # x = self.relu1(x)
-        # # ReLU1 -> maxpool1
-        # x = self.maxpool1(x)
-        # # maxpool1 -> Conv2
-        # x = self.conv2(x)
-        # # Conv2 -> ReLU2
-        # x = self.relu2(x)
-        # # ReLU2 -> maxpool2
-        # x = self.maxpool2(x)
-        # x = flatten(x, 1) #flatten
-        # x = self.fc1(x)
-        # # FC1 -> ReLU3
-        # x = self.relu3(x)
-        # # ReLU3 -> FC2
-        # x = self.fc2(x)
-        # # FC2 -> Softmax
-        # return self.logSoftmax(x)
-        
         out = self.layer1(x)
         out = self.layer2(out)
         out = self.layer3(out)

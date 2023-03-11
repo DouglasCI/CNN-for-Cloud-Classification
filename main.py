@@ -114,7 +114,7 @@ def main():
             
             pred = model(X_batch_train) #forward pass
             loss = loss_func(pred, y_batch_train) #calculate loss
-            optimizer.zero_grad() #zero out the gradients
+            optimizer.zero_grad() #zero out gradients
             loss.backward() #backpropagation
             optimizer.step() #update weights
             train_loss += loss #accumulate training loss
@@ -205,7 +205,7 @@ def main():
     axis[1].legend(handles=[line3, line4])
     
     plt.savefig(args["plot"])
-    torch.save(model, args["model"])
+    torch.save(model.state_dict(), args["model"])
 
 if __name__ == "__main__":
     main()
