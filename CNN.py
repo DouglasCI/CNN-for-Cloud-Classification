@@ -44,7 +44,7 @@ class CNN(nn.Module):
             nn.Dropout(0.5),
             nn.Linear(4096, 4096),
             nn.ReLU())
-        self.fc2= nn.Sequential(
+        self.fc2 = nn.Sequential(
             nn.Linear(4096, num_classes))
 
     def forward(self, x):
