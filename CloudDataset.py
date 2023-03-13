@@ -14,10 +14,10 @@ class CloudDataset():
         """
         Get data split in training and test parts.\n
         Returns:
-        - tensor: image data for training
-        - tensor: labels for training
-        - tensor: image data for test
-        - tensor: labels for test
+        - tensor: image data for training.
+        - tensor: labels for training.
+        - tensor: image data for test.
+        - tensor: labels for test.
         """
         classes = torch.arange(torch.max(self.y_data) + 1)
         X_train = torch.empty((0), dtype=self.X_data.dtype)
@@ -50,9 +50,9 @@ class CloudDataset():
 def _getFiles(data_dir):
     """
     Parameters:
-    - data_dir (string): directory where dataset is located\n
+    - data_dir (string): directory where dataset is located.\n
     Returns:
-    - list: files from database
+    - list: filenames from database.
     """
     files = []
     for file in os.listdir(data_dir):
@@ -62,17 +62,17 @@ def _getFiles(data_dir):
 def _loadImages(data_dir, verbose=True):
     """
     Parameters:
-    - data_dir (string): directory where dataset is located
-    - verbose (boolean): show or not debug messages\n
+    - data_dir (string): directory where dataset is located.
+    - verbose (boolean, optional): show or not debug messages (default=True).\n
     Returns:
-    - tensor: image data
-    - tensor: labels
+    - tensor: image data.
+    - tensor: labels.
     """
     files = _getFiles(data_dir)
     xdata = []  #list of images data
     ydata = []  #list of labels
     count = 0   #counter for labeling
-    img_size = (224, 224)
+    img_size = (227, 227)
     resize_transform = transforms.Compose([
         transforms.ToTensor(),
         transforms.Resize(size=img_size)
@@ -104,23 +104,49 @@ def _loadImages(data_dir, verbose=True):
 def show_image(image):
     plt.imshow(image.permute(1, 2, 0))
     plt.show()
-
+    
 def main():
     dataset = CloudDataset("database/CCSN_v2/")
     X_train, y_train, X_test, y_test = dataset.getData()
     
-    mean = X_train.mean([0, 2, 3])
-    std = X_train.std([0, 2, 3])
-    test_transform = transforms.Compose([
-        transforms.Normalize(mean, std)
-    ])
+    #size of the images
+    img_size = (227, 227)
+
+    # 3 composes
+    transform_list = [
+        transforms.Compose([
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomVerticalFlip(p=0.5),
+            transforms.RandomResizedCrop(size=img_size, scale=(0.5, 1.0))
+        ]),
+        transforms.Compose([
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomVerticalFlip(p=0.5),
+            transforms.RandomResizedCrop(size=img_size, scale=(0.5, 1.0)),
+            transforms.RandomRotation(degrees=180)
+        ]),
+        transforms.Compose([
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomVerticalFlip(p=0.5),
+            transforms.RandomPerspective(p=1)
+        ])
+    ]
+        
+    X_batch = X_train[:16]
+    y_batch = y_train[:16]
+    size = X_batch.shape[0]
     
-    X_normalized = test_transform(X_train)
+    for transform in transform_list:
+        # print(f"{transform=}")
+        for i in range(size):
+            x = transform(X_batch[i]).unsqueeze(dim=0)
+            X_batch = torch.cat((X_batch, x), 0)
+            y_batch = torch.cat((y_batch, y_batch[i].unsqueeze(dim=0)), 0)
+            
+        print(f"{X_batch.shape=}")
+        print(f"{y_batch=}")
     
-    show_image(X_train[0])
-    show_image(X_normalized[0])
-    print(X_train.shape)
-    print(X_normalized.shape)
+    # for i in range(size, X_batch.shape[0]): show_image(X_batch[i])
     
 if __name__ == "__main__":
     main()

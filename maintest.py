@@ -76,25 +76,30 @@ def visTensor(tensor, ch=0, allkernels=False, nrow=8, padding=1):
     elif c != 3: tensor = tensor[:,ch,:,:].unsqueeze(dim=1)
 
     rows = np.min((tensor.shape[0] // nrow + 1, 64))    
+    w = torch.tensor([0.299, 0.587, 0.114]) #weight for RGB
+    # tensor = tensor.permute(1, 2, 0)
+    print(f"{tensor.shape=}")
+    tensor = torch.matmul(tensor, w)
     grid = utils.make_grid(tensor, nrow=nrow, normalize=True, padding=padding)
     plt.figure( figsize=(nrow,rows) )
     plt.imshow(grid.numpy().transpose((1, 2, 0)))
+    # plt.imshow(grid.numpy())
     
-# def imshow_filter(filters,row,col):
-#     print('-------------------------------------------------------------')
-#     plt.figure()
-#     for i in range(len(filters)):
-#         w = np.array([0.299, 0.587, 0.114]) #weight for RGB
-#         img = filters[i]
-#         img = np.transpose(img, (1, 2, 0))
-#         img = img/(img.max()-img.min())
-#         img = np.dot(img,w)
+def imshow_filter(filters,row,col):
+    print('-------------------------------------------------------------')
+    plt.figure()
+    for i in range(len(filters)):
+        w = np.array([0.299, 0.587, 0.114]) #weight for RGB
+        img = filters[i]
+        img = np.transpose(img, (1, 2, 0))
+        img = img/(img.max()-img.min())
+        img = np.dot(img,w)
 
-#         plt.subplot(row,col,i+1)
-#         plt.imshow(img,cmap= 'gray')
-#         plt.xticks([])
-#         plt.yticks([])
-#     plt.show()
+        plt.subplot(row,col,i+1)
+        plt.imshow(img,cmap= 'gray')
+        plt.xticks([])
+        plt.yticks([])
+    plt.show()
 
 def main():
     

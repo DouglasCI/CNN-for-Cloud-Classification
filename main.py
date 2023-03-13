@@ -12,23 +12,24 @@ from sklearn.metrics import classification_report
 
 
 LEARN_RATE = 1e-3
-EPOCHS = 20
-BATCH_SIZE = 32
-TRAIN_SIZE = 0.75
+EPOCHS = 100
+BATCH_SIZE = 8
+TRAIN_SIZE = 0.8
+DATA_AUG_FACTOR = 3 #used to consider data augmentation in training set when calculating accuracy
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def split_data(X, y, data_size, train_size):
+def split_data(X, y, data_size, train_size=0.8):
     """
     Parameters:
-    - X (tensor): input dataset
-    - y (tensor): input labels
-    - data_size (int): size of dataset
-    - train_size (int): size of train tensor\n
+    - X (tensor): input dataset.
+    - y (tensor): input labels.
+    - data_size (int): size of dataset.
+    - train_size (float, optional): % of dataset as train data (default=0.8).\n
     Returns:
-    - tensor: image data for training
-    - tensor: labels for training
-    - tensor: image data for validation
-    - tensor: labels for validation
+    - tensor: image data for training.
+    - tensor: labels for training.
+    - tensor: image data for validation.
+    - tensor: labels for validation.
     """
     mask = torch.randperm(data_size)
     split = int(data_size * train_size)
@@ -42,18 +43,18 @@ def split_data(X, y, data_size, train_size):
 
     return X_train, y_train, X_val, y_val
 
-def get_batches(X, y, data_size, batch_size, random=True):
+def get_batches(X, y, data_size, batch_size=16, random=True):
     """
-    Split a dataset and its labels into randomized batches\n
+    Split a dataset and its labels into batches.\n
     Parameters:
-    - X (tensor): input dataset
-    - y (tensor): input labels
-    - data_size (int): size of dataset
-    - batch_size (int): size of batches
-    - random (boolean): decide if batches are randomized or not\n
+    - X (tensor): input dataset.
+    - y (tensor): input labels.
+    - data_size (int): size of dataset.
+    - batch_size (float, optional): size of batch (default=16).
+    - random (boolean, optional): randomize batches? (default=True).\n
     Returns:
-    - list: list with image data batches
-    - list: list with labels batches
+    - list<tensor>: image data batches.
+    - list<tensor>: labels batches.
     """
     num_batches = int(data_size / batch_size)
     X_batches = []
@@ -66,21 +67,65 @@ def get_batches(X, y, data_size, batch_size, random=True):
 
     return X_batches, y_batches
 
-def normalize(X):
+def normalize(X, use_fixed_values):
     """
+    Normalizes input tensor by color channels,
+    can receive fixed values for mean and std.\n
     Parameters:
-    - X (tensor): input dataset\n
+    - X (tensor): input tensor.
+    - use_fixed_values (boolean): use fixed values for mean and std?\n
     Returns:
-    - tensor: normalized tensor
+    - tensor: normalized tensor.
     """
-    mean = X.mean([0, 2, 3])
-    std = X.std([0, 2, 3])
+    if use_fixed_values:
+        # values calculated from the entire dataset
+        mean = [0.4798, 0.5234, 0.5620]
+        std = [0.2605, 0.2370, 0.2551]
+    else:
+        mean = X.mean([0, 2, 3])
+        std = X.std([0, 2, 3])
+        
     X_normalized = transforms.Normalize(mean, std)(X)
         
     return X_normalized
 
-def augment(X, y):
-    pass
+def augment(X, y, batch_size=16):
+    """
+    Parameters:
+        X (tensor): input dataset.
+        y (tensor): input labels.
+        batch_size (int, optional): size of batch (default=16). \n
+    Returns:
+        tensor: augmented dataset.
+        tensor: augmented dataset labels.
+    """
+    img_size = (227, 227)
+    transform_list = [
+        transforms.Compose([
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomVerticalFlip(p=0.5),
+            transforms.RandomResizedCrop(size=img_size, scale=(0.5, 1.0))]),
+        transforms.Compose([
+            transforms.RandomHorizontalFlip(p=0.5),
+            transforms.RandomVerticalFlip(p=0.5),
+            transforms.RandomResizedCrop(size=img_size, scale=(0.5, 1.0)),
+            transforms.RandomRotation(degrees=180)]),
+        # transforms.Compose([
+        #     transforms.RandomHorizontalFlip(p=0.5),
+        #     transforms.RandomVerticalFlip(p=0.5),
+        #     transforms.RandomPerspective(p=1)])
+    ]
+    
+    # apply each set of transformations on the batch
+    for transform in transform_list:
+        for i in range(batch_size):
+            xx = transform(X[i]).unsqueeze(dim=0)
+            yy = y[i].unsqueeze(dim=0)
+            X = torch.cat((X, xx), 0)
+            y = torch.cat((y, yy), 0)
+    
+    return X, y
+    
 
 def main():
     ap = argparse.ArgumentParser()
@@ -94,8 +139,8 @@ def main():
     X_train, y_train, X_val, y_val = split_data(X_t, y_t, X_t.shape[0], TRAIN_SIZE)
     # normalize the entire test and validation dataset
     # the training dataset will be normalized in batches
-    X_test_norm = normalize(X_test)
-    X_val_norm = normalize(X_val)
+    X_test_norm = normalize(X_test, use_fixed_values=True)
+    X_val_norm = normalize(X_val, use_fixed_values=True)
 
     num_train = X_train.shape[0]
     num_val = X_val.shape[0]
@@ -120,6 +165,7 @@ def main():
         # set model to training mode
         model.train()
         
+        # values to calculate loss and accuracy
         train_loss = 0
         val_loss = 0
         num_train_correct = 0
@@ -129,15 +175,17 @@ def main():
         X_batches_train, y_batches_train = get_batches(X_train, y_train, num_train, BATCH_SIZE, random=True)
         for X_batch_train, y_batch_train in zip(X_batches_train, y_batches_train):
             # normalize this batch
-            X_batch_train_norm = normalize(X_batch_train)
-            X_batch_aug = augment(X_batch_train_norm)
+            X_batch_train = normalize(X_batch_train, use_fixed_values=False)
+            
+            # augment this batch
+            X_batch_train, y_batch_train = augment(X_batch_train, y_batch_train, BATCH_SIZE)
             
             # send it to the device
-            X_batch_aug = X_batch_aug.to(DEVICE)
+            X_batch_train = X_batch_train.to(DEVICE)
             y_batch_train = y_batch_train.type(torch.LongTensor)
             y_batch_train = y_batch_train.to(DEVICE)
             
-            pred = model(X_batch_aug) #forward pass
+            pred = model(X_batch_train) #forward pass
             loss = loss_func(pred, y_batch_train) #calculate loss
             optimizer.zero_grad() #zero out gradients
             loss.backward() #backpropagation
@@ -145,8 +193,8 @@ def main():
             train_loss += loss #accumulate training loss
             
             # calculate the number of correct predictions
-            num_train_correct += (pred.argmax(1) == y_batch_train).type(torch.float).sum().item()
-
+            num_train_correct += (pred.argmax(axis=1) == y_batch_train).type(torch.float).sum().item()
+            
         # switch off autograd for evaluation
         with torch.no_grad():
             # set model to evaluation mode
@@ -157,14 +205,14 @@ def main():
             for X_batch_val, y_batch_val in zip(X_batches_val, y_batches_val):
                 # send it to the device
                 X_batch_val = X_batch_val.to(DEVICE)
-                y_batch_val = y_batch_train.type(torch.LongTensor)
+                y_batch_val = y_batch_val.type(torch.LongTensor)
                 y_batch_val = y_batch_val.to(DEVICE)
                 
                 pred = model(X_batch_val) # make the predictions
                 val_loss += loss_func(pred, y_batch_val) #accumulate validation loss
                 
                 # calculate the number of correct predictions
-                num_val_correct += (pred.argmax(1) == y_batch_val).type(torch.float).sum().item()
+                num_val_correct += (pred.argmax(axis=1) == y_batch_val).type(torch.float).sum().item()
         
         # calculate the average training and validation loss
         num_iter_train = max(num_train // BATCH_SIZE, 1)
@@ -173,8 +221,8 @@ def main():
         avg_val_loss = val_loss / num_iter_val
         
         # calculate the training and validation accuracy
-        num_train_correct = num_train_correct / num_train
-        num_val_correct = num_val_correct / num_val
+        num_train_correct = num_train_correct / (num_iter_train * BATCH_SIZE * DATA_AUG_FACTOR) #data augmentation
+        num_val_correct = num_val_correct / (num_iter_val * BATCH_SIZE)
         
         # update training history
         history["train_loss"].append(avg_train_loss.cpu().detach().numpy())
